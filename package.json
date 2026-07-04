@@ -1,0 +1,37 @@
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "build-keycloak-theme": "npm run build && keycloakify build && node -e \"const fs=require('fs'),path=require('path');const jar=fs.readdirSync('dist_keycloak').find(f=>f.endsWith('.jar'));if(jar){fs.mkdirSync('../infraestructura/keycloak/themes',{recursive:true});fs.copyFileSync('dist_keycloak/'+jar,'../infraestructura/keycloak/themes/'+jar);console.log('JAR copiado: '+jar);}\" "
+  },
+  "dependencies": {
+    "@ant-design/icons": "^6.2.5",
+    "@hookform/resolvers": "^5.4.0",
+    "@react-keycloak/web": "^3.4.0",
+    "@tanstack/react-query": "^5.101.1",
+    "antd": "^6.4.5",
+    "axios": "^1.18.1",
+    "keycloak-js": "^26.2.4",
+    "keycloakify": "^11.15.10",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-hook-form": "^7.80.0",
+    "react-router-dom": "^7.18.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "oxlint": "^1.69.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.0"
+  }
+}
