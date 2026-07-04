@@ -1,4 +1,4 @@
-# Logs
+# ---- Logs ----
 logs
 *.log
 npm-debug.log*
@@ -7,12 +7,24 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# ---- Dependencias ----
 node_modules
-dist
-dist-ssr
-*.local
 
-# Editor directories and files
+# ---- Build output ----
+dist
+dist-sr
+# JARs del tema Keycloakify — generados con npm run build-keycloak-theme
+dist_keycloak/
+
+# ---- Recursos de preview de Keycloakify (solo dev local) ----
+public/keycloakify-dev-resources/
+
+# ---- Secrets ----
+.env
+.env.*
+!.env.example
+
+# ---- Editor ----
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -22,3 +34,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# ---- OS ----
+Thumbs.db
+desktop.ini
