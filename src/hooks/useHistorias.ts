@@ -35,3 +35,19 @@ export function useEpisodioCompleto(idEpisodio: string | null) {
     staleTime: 5 * 60_000,
   });
 }
+
+export function useRecetasPorPaciente(idPaciente: number | null) {
+  return useQuery({
+    queryKey: ['historias', 'recetas', idPaciente],
+    queryFn: () => historiasApi.listarRecetasPorPaciente(idPaciente!),
+    enabled: idPaciente != null,
+  });
+}
+
+export function useOrdenesPorPaciente(idPaciente: number | null) {
+  return useQuery({
+    queryKey: ['historias', 'ordenes', idPaciente],
+    queryFn: () => historiasApi.listarOrdenesPorPaciente(idPaciente!),
+    enabled: idPaciente != null,
+  });
+}

@@ -1,8 +1,8 @@
 import { useState, useMemo, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useKeycloak } from '@react-keycloak/web';
 import { extractApiError, serviceErrorMessage } from '../../utils/errorUtils';
 import {
-  Tabs,
   Alert,
   Select,
   DatePicker,
@@ -68,20 +68,18 @@ const ESTADO_TAG: Record<EstadoCita, { color: string; label: string }> = {
 
 
 export default function CitasPage() {
+  const location = useLocation();
   const { keycloak } = useKeycloak();
   const userRoles: string[] = keycloak.realmAccess?.roles ?? [];
   const puedeAgendar = userRoles.some(r => ['RECEPCIONISTA', 'ADMIN', 'ADMINISTRATIVO'].includes(r));
 
   const { isError: isServiceDown, error: serviceError } = useDisponibilidadCitas();
 
-  const tabs = [
-    ...(puedeAgendar ? [{ key: 'agendar', label: 'Agendar cita', children: <AgendarTab /> }] : []),
-    { key: 'listado', label: 'Listado de citas', children: <ListadoTab /> },
-  ];
+  const showAgendar = puedeAgendar && location.pathname.endsWith('/agendar');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 14 }}>
-      <PageHeader title="Citas" />
+      <PageHeader title={showAgendar ? 'Agendar cita' : 'Listado de citas'} />
 
       {isServiceDown && (
         <Alert
@@ -92,7 +90,7 @@ export default function CitasPage() {
         />
       )}
 
-      <Tabs defaultActiveKey={puedeAgendar ? 'agendar' : 'listado'} items={tabs} />
+      {showAgendar ? <AgendarTab /> : <ListadoTab />}
     </div>
   );
 }
@@ -310,6 +308,7 @@ function AgendarDrawer({
     enabled: searchQuery.trim().length >= 2,
   });
 
+  const { keycloak } = useKeycloak();
   const crearMut = useCrearCita();
 
   const handleClose = () => {
@@ -322,7 +321,7 @@ function AgendarDrawer({
   const handleConfirmar = async () => {
     if (!slot || !idPersonal || !pacienteSeleccionado) return;
     try {
-      await crearMut.mutateAsync({
+      const cita = await crearMut.mutateAsync({
         idPaciente: pacienteSeleccionado.id,
         idPersonal,
         fechaHora: slot.fechaHora,
@@ -998,6 +997,7 @@ function ReagendarDrawer({
   onClose: () => void;
   notification: ReturnType<typeof App.useApp>['notification'];
 }) {
+  const { keycloak } = useKeycloak();
   const [mesVisible, setMesVisible] = useState<Dayjs>(dayjs());
   const [fechaSeleccionada, setFechaSeleccionada] = useState<Dayjs>(dayjs());
   const [slotSeleccionado, setSlotSeleccionado] = useState<string | null>(null);

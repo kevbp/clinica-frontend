@@ -30,9 +30,11 @@ export interface PacienteUpdateRequestDTO {
   nombres?: string;
   apellidos?: string;
   fechaNacimiento?: string;
-  direccion?: string;
-  celular?: string;
-  correo?: string;
+  direccion?: string | null;
+  celular?: string | null;
+  correo?: string | null;
+  nombreBanco?: string | null;
+  numeroCuenta?: string | null;
 }
 
 export interface AntecedenteClinicoResponseDTO {

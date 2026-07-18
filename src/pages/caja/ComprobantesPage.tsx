@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { extractApiError, serviceErrorMessage } from '../../utils/errorUtils';
 import { Alert, Table, Tag, Button, Modal, Typography, Space, Spin, Empty, Tabs, Input, Form, App, Divider } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
@@ -555,7 +555,12 @@ function DetalleComprobanteModal({
                 <Linea label="Médico" value={nombreMedico ?? '—'} />
                 <Linea label="Fecha de cita" value={cita ? dayjs(cita.fechaHora).format('DD/MM/YYYY HH:mm') : '—'} />
               </>
-            ) : null}
+            ) : (
+              <>
+                {comprobante.idReceta && <Linea label="Ref. Receta" value={`...${comprobante.idReceta.slice(-8)}`} />}
+                {comprobante.idOrden && <Linea label="Ref. Orden Lab." value={`...${comprobante.idOrden.slice(-8)}`} />}
+              </>
+            )}
             <div style={{ borderTop: '1px dashed #ccc', margin: '8px 0' }} />
             {esConsulta ? (
               <Linea
@@ -565,7 +570,7 @@ function DetalleComprobanteModal({
             ) : (
               proforma?.items.filter(i => i.estado === 'PAGADO').map(i => (
                 <div key={i.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                  <span style={{ color: '#666' }}>{i.descripcion}{i.cantidad ? ` x${i.cantidad}` : ''}</span>
+                  <span style={{ color: '#666' }}>{i.nombreItem}{i.cantidad ? ` x${i.cantidad}` : ''}</span>
                   <span>S/ {i.precioCongelado.toFixed(2)}</span>
                 </div>
               ))
@@ -686,17 +691,17 @@ function construirHtml(
   esConsulta: boolean,
   nombreMedico: string | null,
   fechaHoraCita: string | undefined,
-  proforma: { items: { descripcion: string; cantidad?: number; precioCongelado: number; estado: string }[] } | undefined,
+  proforma: { items: { nombreItem: string; cantidad?: number; precioCongelado: number; estado: string }[] } | undefined,
 ): string {
   const precioOriginal = (c.montoTotal + (c.descuento ?? 0)).toFixed(2);
   const filasMeta = esConsulta
     ? `<div class="row"><span>Médico</span><span>${nombreMedico ?? '—'}</span></div>
        <div class="row"><span>Fecha de cita</span><span>${fechaHoraCita ? dayjs(fechaHoraCita).format('DD/MM/YYYY HH:mm') : '—'}</span></div>`
-    : '';
+    : `${c.idReceta ? `<div class="row"><span>Ref. Receta</span><span>...${c.idReceta.slice(-8)}</span></div>` : ''}${c.idOrden ? `<div class="row"><span>Ref. Orden Lab.</span><span>...${c.idOrden.slice(-8)}</span></div>` : ''}`;
   const filasDetalle = esConsulta
     ? `<div class="row"><span>Consulta médica</span><span>S/ ${precioOriginal}</span></div>${c.descuento && c.descuento > 0 ? `<div class="row" style="color:#389e0d"><span>Descuento (${c.conceptoDescuento ?? 'Descuento'})</span><span>-S/ ${c.descuento.toFixed(2)}</span></div>` : ''}`
     : (proforma?.items.filter(i => i.estado === 'PAGADO').map(i =>
-        `<div class="row"><span>${i.descripcion}${i.cantidad ? ` x${i.cantidad}` : ''}</span><span>S/ ${i.precioCongelado.toFixed(2)}</span></div>`
+        `<div class="row"><span>${i.nombreItem}${i.cantidad ? ` x${i.cantidad}` : ''}</span><span>S/ ${i.precioCongelado.toFixed(2)}</span></div>`
       ).join('') ?? '');
 
   return `<!DOCTYPE html>

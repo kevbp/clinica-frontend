@@ -17,6 +17,9 @@ export interface SignosVitalesDTO {
 
 export interface LineaRecetaDTO {
   idMedicamento: number;
+  nombreMedicamento?: string;
+  principioActivo?: string;
+  presentacion?: string;
   dosis: string;
   viaAdministracion: string;
   frecuencia: string;
@@ -27,6 +30,8 @@ export interface LineaRecetaDTO {
 
 export interface LineaOrdenDTO {
   idExamen: number;
+  nombreExamen?: string;
+  categoria?: string;
   indicacionesPreparacion?: string;
 }
 

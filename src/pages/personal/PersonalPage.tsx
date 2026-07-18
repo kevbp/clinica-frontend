@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { extractApiError } from '../../utils/errorUtils';
 import { useQueryClient } from '@tanstack/react-query';
 import { useKeycloak } from '@react-keycloak/web';
@@ -17,7 +18,6 @@ import {
   Space,
   App,
   Alert,
-  Tabs,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -63,6 +63,7 @@ const TIPO_COLORS: Record<TipoPersonal, string> = {
 type DrawerMode = 'create' | 'edit' | null;
 
 export default function PersonalPage() {
+  const location = useLocation();
   const { notification } = App.useApp();
   const { keycloak }      = useKeycloak();
   const [form]    = Form.useForm();
@@ -151,7 +152,7 @@ export default function PersonalPage() {
 
     if (drawerMode === 'create') {
       try {
-        const created = await crearMut.mutateAsync({
+        const response = await crearMut.mutateAsync({
           nombres:            String(values.nombres ?? ''),
           apellidos:          String(values.apellidos ?? ''),
           documentoIdentidad: String(values.documentoIdentidad ?? ''),
@@ -165,8 +166,6 @@ export default function PersonalPage() {
           idEspecialidad:     values.tipoPersonal === 'MEDICO' && values.idEspecialidad
                                 ? Number(values.idEspecialidad) : undefined,
         });
-        void created;
-
         notification.success({ message: 'Personal registrado exitosamente' });
         closeDrawer();
       } catch (err: unknown) {
@@ -447,12 +446,7 @@ export default function PersonalPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
 
-      <Tabs
-        items={[
-          {
-            key: 'personal',
-            label: 'Personal',
-            children: (
+      {location.pathname.endsWith('/especialidades') ? null : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
                 <PageHeader
@@ -538,12 +532,8 @@ export default function PersonalPage() {
                 </div>
 
               </div>
-            ),
-          },
-          {
-            key: 'especialidades',
-            label: 'Especialidades',
-            children: (
+      )}
+      {location.pathname.endsWith('/especialidades') ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
                 <PageHeader
@@ -575,10 +565,7 @@ export default function PersonalPage() {
                 </div>
 
               </div>
-            ),
-          },
-        ]}
-      />
+      ) : null}
 
       {/* Drawer crear / editar — Personal */}
       <Drawer

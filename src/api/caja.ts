@@ -3,6 +3,7 @@ import type {
   PagoConsultaRequestDTO,
   PagoConsultaResponseDTO,
   ProformaResponseDTO,
+  ConstruirProformaRequestDTO,
   PagarItemsRequestDTO,
   NotaCreditoResponseDTO,
   ComprobanteResponseDTO,
@@ -54,8 +55,17 @@ export const listarProformasPorPaciente = (idPaciente: number): Promise<Proforma
 export const obtenerProforma = (id: number): Promise<ProformaResponseDTO> =>
   api.get<ProformaResponseDTO>(`/proformas/${id}`).then(r => r.data);
 
-export const construirProforma = (idPaciente: number): Promise<ProformaResponseDTO> =>
-  api.post<ProformaResponseDTO>(`/proformas/paciente/${idPaciente}`).then(r => r.data);
+export const construirDesdeReceta = (idReceta: string, data: ConstruirProformaRequestDTO): Promise<ProformaResponseDTO> =>
+  api.post<ProformaResponseDTO>(`/proformas/receta/${idReceta}`, data).then(r => r.data);
+
+export const construirDesdeOrden = (idOrden: string, data: ConstruirProformaRequestDTO): Promise<ProformaResponseDTO> =>
+  api.post<ProformaResponseDTO>(`/proformas/orden/${idOrden}`, data).then(r => r.data);
+
+export const listarProformasPorReceta = (idReceta: string): Promise<ProformaResponseDTO[]> =>
+  api.get<ProformaResponseDTO[]>(`/proformas/receta/${idReceta}`).then(r => r.data);
+
+export const listarProformasPorOrden = (idOrden: string): Promise<ProformaResponseDTO[]> =>
+  api.get<ProformaResponseDTO[]>(`/proformas/orden/${idOrden}`).then(r => r.data);
 
 export const pagarItemsProforma = (id: number, data: PagarItemsRequestDTO): Promise<ProformaResponseDTO> =>
   api.post<ProformaResponseDTO>(`/proformas/${id}/pagar-items`, data).then(r => r.data);

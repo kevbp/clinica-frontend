@@ -33,6 +33,9 @@ export interface SignosVitalesDTO {
 
 export interface LineaRecetaDTO {
   idMedicamento: number;
+  nombreMedicamento?: string;
+  principioActivo?: string;
+  presentacion?: string;
   dosis: string;
   viaAdministracion: string;
   frecuencia: string;
@@ -46,11 +49,16 @@ export interface RecetaDTO {
   idEpisodioClinico: string;
   idPaciente: number;
   idPersonalMedico: number;
+  fechaEmision?: string;
+  paciente?: PacienteSnapshot;
+  medico?: MedicoSnapshot;
   lineas: LineaRecetaDTO[];
 }
 
 export interface LineaOrdenDTO {
   idExamen: number;
+  nombreExamen?: string;
+  categoria?: string;
   indicacionesPreparacion?: string;
 }
 
@@ -59,6 +67,9 @@ export interface OrdenLaboratorioDTO {
   idEpisodioClinico: string;
   idPaciente: number;
   idPersonalMedico: number;
+  fechaEmision?: string;
+  paciente?: PacienteSnapshot;
+  medico?: MedicoSnapshot;
   lineas: LineaOrdenDTO[];
 }
 

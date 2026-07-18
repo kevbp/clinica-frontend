@@ -5,6 +5,7 @@ import type {
   ConsultorioUpdateRequestDTO,
   ProgramacionHorarioRequestDTO,
   ProgramacionHorarioUpdateRequestDTO,
+  ProgramacionHorarioBatchRequestDTO,
 } from '../types/horarios';
 
 export function useDisponibilidadHorarios() {
@@ -62,6 +63,15 @@ export function useCrearTurno() {
     mutationFn: (data: ProgramacionHorarioRequestDTO) => horariosApi.crearTurno(data),
     onSuccess: (result) =>
       qc.invalidateQueries({ queryKey: ['programacion-horarios', 'personal', result.idPersonal] }),
+  });
+}
+
+export function useCrearTurnosBatch() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: ProgramacionHorarioBatchRequestDTO) => horariosApi.crearTurnosBatch(data),
+    onSuccess: (result) =>
+      qc.invalidateQueries({ queryKey: ['programacion-horarios', 'personal', result.turnos[0]?.idPersonal] }),
   });
 }
 

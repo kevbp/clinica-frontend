@@ -74,10 +74,20 @@ export function useProformasPorPaciente(idPaciente: number | null) {
   });
 }
 
-export function useConstruirProforma() {
+export function useConstruirDesdeReceta() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (idPaciente: number) => cajaApi.construirProforma(idPaciente),
+    mutationFn: ({ idReceta, idsItemsSeleccionados }: { idReceta: string; idsItemsSeleccionados: number[] }) =>
+      cajaApi.construirDesdeReceta(idReceta, { idsItemsSeleccionados }),
+    onSuccess: (result) => qc.invalidateQueries({ queryKey: ['caja', 'proformas', result.idPaciente] }),
+  });
+}
+
+export function useConstruirDesdeOrden() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idOrden, idsItemsSeleccionados }: { idOrden: string; idsItemsSeleccionados: number[] }) =>
+      cajaApi.construirDesdeOrden(idOrden, { idsItemsSeleccionados }),
     onSuccess: (result) => qc.invalidateQueries({ queryKey: ['caja', 'proformas', result.idPaciente] }),
   });
 }

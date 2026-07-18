@@ -10,9 +10,9 @@ import type { ColumnsType } from 'antd/es/table';
 import type { Dayjs } from 'dayjs';
 import {
   ArrowLeftOutlined, MedicineBoxOutlined, ExperimentOutlined,
-  CheckCircleOutlined, WarningOutlined, UserOutlined, HeartOutlined,
+  CheckCircleOutlined, UserOutlined, HeartOutlined,
   HistoryOutlined, CloseOutlined, PlusOutlined, InfoCircleOutlined,
-  ClockCircleOutlined, CalendarOutlined, FileTextOutlined,
+  ClockCircleOutlined, CalendarOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import PageHeader from '../../components/ui/PageHeader';
@@ -32,8 +32,8 @@ import { useHistoriaPorPaciente, useEpisodiosPorHistoria } from '../../hooks/use
 import { useDebouncedSearch } from '../../hooks/useDebouncedSearch';
 import { obtenerAntecedentes } from '../../api/pacientes';
 import { useQuery } from '@tanstack/react-query';
-import type { CitaMedicaResponseDTO, EstadoCita } from '../../types/citas';
-import type { AntecedenteClinicoDTO, DisponibilidadDTO, BorradorResponseDTO } from '../../types/atencion';
+import type { CitaMedicaResponseDTO } from '../../types/citas';
+import type { DisponibilidadDTO, BorradorResponseDTO } from '../../types/atencion';
 import type { AntecedenteClinicoResponseDTO } from '../../types/pacientes';
 import type { EpisodioClinicoDTO, SignosVitalesDTO } from '../../types/historias';
 
@@ -43,9 +43,6 @@ const SEXO_LABEL: Record<string, string> = { MASCULINO: 'Masculino', FEMENINO: '
 const GRUPO_SG_LABEL: Record<string, string> = {
   A_POS: 'A+', A_NEG: 'A−', B_POS: 'B+', B_NEG: 'B−',
   O_POS: 'O+', O_NEG: 'O−', AB_POS: 'AB+', AB_NEG: 'AB−',
-};
-const TIPO_ANTEC_LABEL: Record<string, string> = {
-  ENFERMEDAD_CRONICA: 'Enfermedad crónica', ALERGIA: 'Alergia', OTRO: 'Otro',
 };
 const VIAS = [
   'Oral', 'Sublingual', 'Intravenosa', 'Intramuscular', 'Subcutánea',
@@ -308,6 +305,8 @@ function ListaCitas({
   idPersonal: number;
   onAtender: (idCita: number, idPaciente: number) => void;
 }) {
+  const { keycloak } = useKeycloak();
+  const userRoles: string[] = keycloak.realmAccess?.roles ?? [];
   const { notification } = App.useApp();
   const { data: citas = [], isLoading } = useListaCitas({ idPersonal, estado: 'CONFIRMADA' });
   const nombresPacientes = useNombresPacientes(citas.map(c => c.idPaciente));
@@ -398,13 +397,15 @@ function ListaCitas({
    WORKSPACE — layout de dos columnas
 ════════════════════════════════════════════════════════════════════════════ */
 function Workspace({
-  idCita, idPaciente, idPersonalMedico, onCerrar,
+  idCita, idPaciente, idPersonalMedico: _idPersonalMedico, onCerrar,
 }: {
   idCita: number;
   idPaciente: number;
   idPersonalMedico: number;
   onCerrar: () => void;
 }) {
+  const { keycloak } = useKeycloak();
+  const userRoles: string[] = keycloak.realmAccess?.roles ?? [];
   const { notification, modal } = App.useApp();
   const { data: borrador, isLoading } = useBorrador(idCita);
   const finalizarMut = useFinalizarAtencion();
@@ -795,6 +796,7 @@ function SignosVitalesViewer({ sv }: { sv: SignosVitalesDTO }) {
    SECCIÓN: DIAGNÓSTICO
 ════════════════════════════════════════════════════════════════════════════ */
 function SeccionDiagnostico({ idCita, borrador }: { idCita: number; borrador: BorradorResponseDTO }) {
+  const { keycloak } = useKeycloak();
   const { notification } = App.useApp();
   const [form] = Form.useForm();
   const [editando, setEditando] = useState(!borrador.diagnostico);
@@ -927,6 +929,7 @@ function SeccionTratamiento({ idCita, borrador }: { idCita: number; borrador: Bo
 }
 
 function SubSeccionReceta({ idCita, borrador }: { idCita: number; borrador: BorradorResponseDTO }) {
+  const { keycloak } = useKeycloak();
   const { notification } = App.useApp();
   const [form] = Form.useForm();
   const [mostrarForm, setMostrarForm] = useState(false);
@@ -935,13 +938,11 @@ function SubSeccionReceta({ idCita, borrador }: { idCita: number; borrador: Borr
   const { data: medicamentos = [], isFetching } = useBuscarMedicamentos(searchQ);
   const nombresMed = useNombresMedicamentos(borrador.lineasReceta.map(l => l.idMedicamento));
   const mut = useAgregarReceta();
-  const [advertencias, setAdvertencias] = useState<AntecedenteClinicoDTO[]>([]);
   const [disponibilidad, setDisponibilidad] = useState<DisponibilidadDTO | null>(null);
 
   const guardar = async (v: Parameters<typeof mut.mutateAsync>[0]['data']) => {
     try {
       const r = await mut.mutateAsync({ idCita, data: v });
-      setAdvertencias(r.advertenciasAntecedentes);
       setDisponibilidad(r.disponibilidadMedicamento);
       form.resetFields();
       setSearchInput('');
@@ -979,8 +980,13 @@ function SubSeccionReceta({ idCita, borrador }: { idCita: number; borrador: Borr
               borderRadius: 8, padding: '8px 12px',
             }}>
               <Typography.Text strong style={{ fontSize: 12 }}>
-                {nombresMed.get(l.idMedicamento) ?? `ID: ${l.idMedicamento}`}
+                {l.nombreMedicamento ?? nombresMed.get(l.idMedicamento) ?? `ID: ${l.idMedicamento}`}
               </Typography.Text>
+              {l.principioActivo && (
+                <Typography.Text type="secondary" style={{ fontSize: 11, display: 'block' }}>
+                  {l.principioActivo}{l.presentacion ? ` · ${l.presentacion}` : ''}
+                </Typography.Text>
+              )}
               <div style={{ fontSize: 11, color: C.textoSecundario, marginTop: 2 }}>
                 {l.dosis} · {l.viaAdministracion} · {l.frecuencia} · {l.duracion}
                 {l.cantidadTotal ? ` · ${l.cantidadTotal} uds.` : ''}
@@ -1064,21 +1070,6 @@ function SubSeccionReceta({ idCita, borrador }: { idCita: number; borrador: Borr
         </div>
       )}
 
-      {advertencias.length > 0 && (
-        <Alert type="warning" showIcon icon={<WarningOutlined />}
-          message="Antecedentes a considerar"
-          description={
-            <ul style={{ margin: 0, paddingLeft: 16 }}>
-              {advertencias.map(a => (
-                <li key={a.id} style={{ fontSize: 12 }}>
-                  <strong>{TIPO_ANTEC_LABEL[a.tipo] ?? a.tipo}:</strong> {a.descripcion}
-                </li>
-              ))}
-            </ul>
-          }
-          style={{ marginTop: 8, borderRadius: 8 }}
-        />
-      )}
       {disponibilidad && (
         <Alert
           type={disponibilidad.cantidadTotal > 0 ? 'info' : 'error'}
@@ -1094,6 +1085,7 @@ function SubSeccionReceta({ idCita, borrador }: { idCita: number; borrador: Borr
 }
 
 function SubSeccionOrdenes({ idCita, borrador }: { idCita: number; borrador: BorradorResponseDTO }) {
+  const { keycloak } = useKeycloak();
   const { notification } = App.useApp();
   const [form] = Form.useForm();
   const [mostrarForm, setMostrarForm] = useState(false);
@@ -1142,8 +1134,13 @@ function SubSeccionOrdenes({ idCita, borrador }: { idCita: number; borrador: Bor
               borderRadius: 8, padding: '8px 12px',
             }}>
               <Typography.Text strong style={{ fontSize: 12, color: C.purpura }}>
-                {nombresEx.get(l.idExamen) ?? `ID: ${l.idExamen}`}
+                {l.nombreExamen ?? nombresEx.get(l.idExamen) ?? `ID: ${l.idExamen}`}
               </Typography.Text>
+              {l.categoria && (
+                <Typography.Text type="secondary" style={{ fontSize: 11, display: 'block' }}>
+                  {l.categoria}
+                </Typography.Text>
+              )}
               {l.indicacionesPreparacion && (
                 <div style={{ fontSize: 11, color: C.textoSecundario, marginTop: 2 }}>
                   {l.indicacionesPreparacion}

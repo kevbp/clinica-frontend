@@ -41,3 +41,17 @@ export interface ProgramacionHorarioUpdateRequestDTO {
   horaInicio?: string;
   horaFin?: string;
 }
+
+export interface ProgramacionHorarioBatchRequestDTO {
+  idPersonal: number;
+  idConsultorio: number;
+  fechas: string[]; // ["YYYY-MM-DD", ...]
+  horaInicio: string; // "HH:mm"
+  horaFin: string;
+}
+
+export interface ProgramacionHorarioBatchResponseDTO {
+  total: number;
+  creados: number;
+  turnos: ProgramacionHorarioResponseDTO[];
+}

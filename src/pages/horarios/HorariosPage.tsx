@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import { extractApiError, serviceErrorMessage } from '../../utils/errorUtils';
 import {
   Table,
@@ -8,7 +9,6 @@ import {
   InputNumber,
   Drawer,
   Form,
-  Tabs,
   App,
   Popconfirm,
   Select,
@@ -42,7 +42,7 @@ import {
   useEliminarConsultorio,
   useDisponibilidadHorarios,
   useTurnosPorPersonal,
-  useCrearTurno,
+  useCrearTurnosBatch,
   useActualizarTurno,
   useEliminarTurno,
 } from '../../hooks/useHorarios';
@@ -59,6 +59,7 @@ function inicioDeSemana(d: Dayjs): Dayjs {
 
 
 export default function HorariosPage() {
+  const location = useLocation();
   const { isError: isServiceDown, error: serviceError } = useDisponibilidadHorarios();
 
   return (
@@ -74,12 +75,7 @@ export default function HorariosPage() {
         />
       )}
 
-      <Tabs
-        items={[
-          { key: 'consultorios', label: 'Consultorios', children: <ConsultoriosTab /> },
-          { key: 'programacion', label: 'Programación de horarios', children: <ProgramacionTab /> },
-        ]}
-      />
+      {location.pathname.endsWith('/programacion') ? <ProgramacionTab /> : <ConsultoriosTab />}
     </div>
   );
 }
@@ -277,7 +273,7 @@ function ProgramacionTab() {
   const hasta = (hastaMes.isAfter(finSemanaActual) ? hastaMes : finSemanaActual).format(FORMATO_FECHA);
   const { data: turnos = [], isLoading: isLoadingTurnos } = useTurnosPorPersonal(idPersonal, desde, hasta);
 
-  const crearTurnoMut = useCrearTurno();
+  const crearTurnosBatchMut = useCrearTurnosBatch();
   const actualizarTurnoMut = useActualizarTurno();
   const eliminarTurnoMut = useEliminarTurno();
 
@@ -334,35 +330,25 @@ function ProgramacionTab() {
     const horaInicio = values.rango[0].format('HH:mm');
     const horaFin = values.rango[1].format('HH:mm');
 
-    let creados = 0;
-    const fallidas: string[] = [];
-
-    for (const fecha of values.fechas) {
-      try {
-        await crearTurnoMut.mutateAsync({ idPersonal, idConsultorio: values.idConsultorio, fecha, horaInicio, horaFin });
-        creados += 1;
-      } catch (err: unknown) {
-        const { status, msg } = extractApiError(err);
-        const motivo = status === 409 ? (msg ?? 'consultorio ya ocupado')
-          : status === 404 ? 'consultorio no encontrado'
-          : status === 400 ? (msg ?? 'datos inválidos')
-          : msg ?? `error ${status ?? 'desconocido'}`;
-        fallidas.push(`${dayjs(fecha, FORMATO_FECHA).format('DD/MM')} (${motivo})`);
-      }
-    }
-
-    if (creados > 0) {
+    try {
+      const result = await crearTurnosBatchMut.mutateAsync({
+        idPersonal,
+        idConsultorio: values.idConsultorio,
+        fechas: values.fechas,
+        horaInicio,
+        horaFin,
+      });
       notification.success({
-        message: creados === 1 ? '1 turno registrado' : `${creados} turnos registrados`,
+        message: result.creados === 1 ? '1 turno registrado' : `${result.creados} turnos registrados`,
       });
-    }
-    if (fallidas.length > 0) {
+      closeCrear();
+    } catch (err: unknown) {
+      const { msg } = extractApiError(err);
       notification.error({
-        message: fallidas.length === 1 ? '1 turno no se pudo crear' : `${fallidas.length} turnos no se pudieron crear`,
-        description: fallidas.join('; '),
+        message: 'No se pudieron crear los turnos',
+        description: msg ?? 'Verifica que ninguna fecha tenga conflicto de horario.',
       });
     }
-    if (fallidas.length === 0) closeCrear();
   };
 
   const handleEditarTurno = async (values: { idConsultorio: number; fecha: Dayjs; rango: [Dayjs, Dayjs] }) => {
@@ -581,7 +567,7 @@ function ProgramacionTab() {
         footer={
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
             <Button onClick={closeCrear}>Cancelar</Button>
-            <Button type="primary" loading={crearTurnoMut.isPending} onClick={() => crearForm.submit()}>
+            <Button type="primary" loading={crearTurnosBatchMut.isPending} onClick={() => crearForm.submit()}>
               Registrar
             </Button>
           </div>

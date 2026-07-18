@@ -9,48 +9,45 @@ import {
   CloseOutlined,
   MailOutlined,
   SendOutlined,
+  MedicineBoxOutlined,
+  ExperimentOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import * as cajaApi from '../../api/caja';
-import { useConfirmarPagoConsulta } from '../../hooks/useCaja';
 import { extractApiError } from '../../utils/errorUtils';
-import type { ComprobanteResponseDTO, PagoConsultaResponseDTO } from '../../types/caja';
+import type { ComprobanteResponseDTO, ProformaResponseDTO } from '../../types/caja';
 
 const NOMBRE_CENTRO = 'Centro Médico Esperanza Sur';
 const SEDE = 'Sede Lima Sur';
 
-type Fase = 'procesando' | 'sin_confirmar' | 'error' | 'boleta' | 'boleta_no_disponible';
+type Fase = 'procesando' | 'error' | 'boleta' | 'boleta_no_disponible';
 type MetodoPago = 'efectivo' | 'tarjeta';
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-interface PasarelaPagoModalProps {
+interface Props {
   open: boolean;
-  pagoId: number | null;
+  proforma: ProformaResponseDTO | null;
+  /** IDs de ItemProforma (no idItem) a pagar */
+  idsItems: number[];
   paciente: string;
-  medico: string;
-  especialidad?: string;
-  fechaHoraCita: string;
   correoPaciente?: string;
   metodo: MetodoPago;
   onClose: () => void;
-  onFinalizado: (resultado: PagoConsultaResponseDTO) => void;
 }
 
-export default function PasarelaPagoModal({
-  open, pagoId, paciente, medico, especialidad, fechaHoraCita, correoPaciente,
-  metodo, onClose, onFinalizado,
-}: PasarelaPagoModalProps) {
+export default function PasarelaProformaModal({
+  open, proforma, idsItems, paciente, correoPaciente, metodo, onClose,
+}: Props) {
   const { notification } = App.useApp();
   const [fase, setFase] = useState<Fase>('procesando');
   const [mensaje, setMensaje] = useState('Conectando con el sistema de pagos…');
   const [comprobante, setComprobante] = useState<ComprobanteResponseDTO | null>(null);
   const [correoEnvio, setCorreoEnvio] = useState('');
   const [enviandoCorreo, setEnviandoCorreo] = useState(false);
-  const confirmarMut = useConfirmarPagoConsulta();
 
   useEffect(() => {
-    if (!open || pagoId === null) return;
+    if (!open || !proforma || idsItems.length === 0) return;
     setCorreoEnvio('');
     let cancelado = false;
 
@@ -62,7 +59,7 @@ export default function PasarelaPagoModal({
         setMensaje('Conectando con el sistema de pagos…');
         await delay(700);
         if (cancelado) return;
-        setMensaje('Verificando disponibilidad del cupo…');
+        setMensaje('Verificando disponibilidad de ítems…');
         await delay(700);
         if (cancelado) return;
         setMensaje('Procesando transacción con tarjeta…');
@@ -77,32 +74,23 @@ export default function PasarelaPagoModal({
         if (cancelado) return;
       }
 
-      let resultado: PagoConsultaResponseDTO;
       try {
-        resultado = await confirmarMut.mutateAsync(pagoId!);
-      } catch {
+        await cajaApi.pagarItemsProforma(proforma!.id, { idsItems });
+      } catch (err: unknown) {
         if (!cancelado) {
+          const { msg } = extractApiError(err);
+          notification.error({ message: 'Error al procesar el pago', description: msg });
           setFase('error');
         }
         return;
       }
       if (cancelado) return;
-      onFinalizado(resultado);
 
-      if (resultado.estado === 'PAGADO_SIN_CONFIRMAR') {
-        setFase('sin_confirmar');
-        return;
-      }
-
-      await cargarBoleta();
-    }
-
-    async function cargarBoleta() {
-      setMensaje('Generando boleta…');
+      setMensaje('Emitiendo comprobante…');
       try {
-        const boleta = await cajaApi.obtenerComprobantePagoConsulta(pagoId!);
+        const comp = await cajaApi.emitirComprobante(proforma!.id);
         if (cancelado) return;
-        setComprobante(boleta);
+        setComprobante(comp);
         setFase('boleta');
       } catch {
         if (!cancelado) setFase('boleta_no_disponible');
@@ -111,31 +99,20 @@ export default function PasarelaPagoModal({
 
     procesar();
     return () => { cancelado = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, pagoId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, proforma?.id]);
 
   const reintentarBoleta = async () => {
+    if (!proforma) return;
     setFase('procesando');
-    setMensaje('Generando boleta…');
+    setMensaje('Emitiendo comprobante…');
     try {
-      const boleta = await cajaApi.obtenerComprobantePagoConsulta(pagoId!);
-      setComprobante(boleta);
+      const comp = await cajaApi.emitirComprobante(proforma.id);
+      setComprobante(comp);
       setFase('boleta');
     } catch {
       setFase('boleta_no_disponible');
     }
-  };
-
-  const handleDescargar = () => {
-    if (!comprobante) return;
-    const html = construirHtmlBoleta(comprobante, paciente, medico, fechaHoraCita, especialidad);
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${comprobante.numero}.html`;
-    a.click();
-    URL.revokeObjectURL(url);
   };
 
   const handleEnviarCorreo = async () => {
@@ -152,7 +129,21 @@ export default function PasarelaPagoModal({
     }
   };
 
+  const handleDescargar = () => {
+    if (!comprobante || !proforma) return;
+    const itemsPagados = proforma.items.filter(i => idsItems.includes(i.id));
+    const html = construirHtmlProforma(comprobante, paciente, itemsPagados);
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${comprobante.numero}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const tituloModal = metodo === 'tarjeta' ? 'Pasarela de pago' : 'Confirmar pago en efectivo';
+  const itemsPagados = proforma?.items.filter(i => idsItems.includes(i.id)) ?? [];
 
   return (
     <Modal
@@ -161,7 +152,7 @@ export default function PasarelaPagoModal({
       closable={fase !== 'procesando'}
       maskClosable={false}
       footer={null}
-      width={460}
+      width={480}
       centered
       title={fase === 'procesando' ? tituloModal : undefined}
     >
@@ -175,11 +166,6 @@ export default function PasarelaPagoModal({
         .pasarela-icono-procesando { animation: pasarela-spin 1.1s linear infinite; }
         .pasarela-icono-resultado  { animation: pasarela-pop 0.35s ease-out; }
         .pasarela-tarjeta-animada  { animation: pasarela-card-slide 0.4s ease-out; }
-        @media print {
-          body * { visibility: hidden; }
-          #boleta-imprimible, #boleta-imprimible * { visibility: visible; }
-          #boleta-imprimible { position: absolute; left: 0; top: 0; width: 100%; }
-        }
       `}</style>
 
       {fase === 'procesando' && (
@@ -196,18 +182,9 @@ export default function PasarelaPagoModal({
         </div>
       )}
 
-      {fase === 'sin_confirmar' && (
-        <Result
-          icon={<ExclamationCircleFilled className="pasarela-icono-resultado" style={{ color: '#faad14' }} />}
-          status="warning"
-          title="Pago registrado, pero la cita no pudo confirmarse"
-          subTitle="Esto requiere revisión manual del área administrativa. El monto ya quedó registrado en el sistema."
-          extra={<Button type="primary" onClick={onClose}>Entendido</Button>}
-        />
-      )}
-
       {fase === 'error' && (
         <Result
+          icon={<ExclamationCircleFilled className="pasarela-icono-resultado" style={{ color: '#ff4d4f' }} />}
           status="error"
           title="No se pudo procesar el pago"
           subTitle="Intente nuevamente. Si el problema persiste, contacte al área de soporte."
@@ -220,7 +197,7 @@ export default function PasarelaPagoModal({
           icon={<CheckCircleFilled className="pasarela-icono-resultado" style={{ color: '#0F6E56' }} />}
           status="success"
           title="Pago confirmado"
-          subTitle="El pago se registró correctamente, pero no se pudo cargar la boleta para previsualizarla. Puede consultarla en Comprobantes."
+          subTitle="El pago se registró correctamente, pero no se pudo cargar el comprobante. Puede consultarlo en Comprobantes."
           extra={
             <Space>
               <Button onClick={reintentarBoleta}>Reintentar</Button>
@@ -232,7 +209,6 @@ export default function PasarelaPagoModal({
 
       {fase === 'boleta' && comprobante && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-
           {/* Encabezado de éxito */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0 2px' }}>
             <CheckCircleFilled className="pasarela-icono-resultado" style={{ fontSize: 28, color: '#0F6E56' }} />
@@ -244,9 +220,9 @@ export default function PasarelaPagoModal({
             </div>
           </div>
 
-          {/* Vista rápida de la boleta */}
+          {/* Boleta */}
           <div
-            id="boleta-imprimible"
+            id="boleta-proforma-imprimible"
             style={{
               border: '1px dashed #d9d9d9', borderRadius: 8, padding: '16px 18px',
               background: '#FAFAFA', fontFamily: 'monospace', fontSize: 12.5,
@@ -261,22 +237,24 @@ export default function PasarelaPagoModal({
             </div>
             <FilaBoleta label="Fecha de emisión" value={dayjs(comprobante.fechaEmision).format('DD/MM/YYYY HH:mm')} />
             <FilaBoleta label="Paciente" value={paciente} />
-            <FilaBoleta label="Médico" value={medico} />
-            {especialidad && <FilaBoleta label="Especialidad" value={especialidad} />}
-            <FilaBoleta label="Fecha de cita" value={dayjs(fechaHoraCita).format('DD/MM/YYYY HH:mm')} />
-            <FilaBoleta label="Concepto" value="Consulta médica" />
-            {comprobante.descuento != null && comprobante.descuento > 0 && (
-              <>
-                <div style={{ borderTop: '1px dashed #ccc', margin: '8px 0' }} />
-                <FilaBoleta label="Precio del servicio" value={`S/ ${(comprobante.montoTotal + comprobante.descuento).toFixed(2)}`} />
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 2 }}>
-                  <span style={{ color: '#389e0d' }}>Descuento ({comprobante.conceptoDescuento ?? 'Descuento'})</span>
-                  <span style={{ color: '#389e0d' }}>-S/ {comprobante.descuento.toFixed(2)}</span>
+            <div style={{ borderTop: '1px dashed #ccc', margin: '8px 0' }} />
+            {/* Ítems */}
+            {itemsPagados.map(item => (
+              <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 3 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#555', flex: 1, minWidth: 0 }}>
+                  {item.tipo === 'MEDICAMENTO'
+                    ? <MedicineBoxOutlined style={{ fontSize: 11, flexShrink: 0 }} />
+                    : <ExperimentOutlined style={{ fontSize: 11, flexShrink: 0 }} />}
+                  <span style={{ wordBreak: 'break-word' }}>
+                    {item.nombreItem}
+                    {item.cantidad && item.cantidad > 1 ? ` ×${item.cantidad}` : ''}
+                  </span>
                 </div>
-              </>
-            )}
+                <span style={{ whiteSpace: 'nowrap' }}>S/ {item.precioCongelado.toFixed(2)}</span>
+              </div>
+            ))}
             <div style={{ borderTop: '1px dashed #ccc', margin: '10px 0' }} />
-            <FilaBoleta label="Subtotal (sin IGV)" value={`S/ ${comprobante.subtotal.toFixed(2)}`} />
+            <FilaBoleta label="Subtotal" value={`S/ ${comprobante.subtotal.toFixed(2)}`} />
             <FilaBoleta label="IGV (18%)" value={`S/ ${comprobante.igv.toFixed(2)}`} />
             <div style={{ borderTop: '1px dashed #ccc', margin: '8px 0' }} />
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -285,7 +263,7 @@ export default function PasarelaPagoModal({
             </div>
           </div>
 
-          {/* Enviar por correo */}
+          {/* Correo */}
           <div style={{ background: '#f0f7f4', border: '1px solid #b7e3d4', borderRadius: 8, padding: '12px 14px' }}>
             <Typography.Text strong style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
               <MailOutlined style={{ marginRight: 6 }} />
@@ -344,7 +322,6 @@ function FilaBoleta({ label, value }: { label: string; value: string }) {
 function TarjetaAnimacion({ mensaje }: { mensaje: string }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
-      {/* Tarjeta animada */}
       <div
         className="pasarela-tarjeta-animada"
         style={{
@@ -355,29 +332,17 @@ function TarjetaAnimacion({ mensaje }: { mensaje: string }) {
           display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
         }}
       >
-        {/* Chip */}
         <div style={{
           width: 32, height: 24, borderRadius: 4,
           background: 'linear-gradient(135deg, #d4af37 0%, #f0d060 50%, #b8960c 100%)',
           boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
         }} />
-        {/* Número oculto */}
         <Typography.Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14, letterSpacing: 4, fontFamily: 'monospace' }}>
           •••• •••• •••• ••••
         </Typography.Text>
-        {/* Marca de onda decorativa */}
-        <div style={{
-          position: 'absolute', right: -20, top: -20,
-          width: 120, height: 120, borderRadius: '50%',
-          background: 'rgba(255,255,255,0.04)',
-        }} />
-        <div style={{
-          position: 'absolute', right: 10, top: 10,
-          width: 70, height: 70, borderRadius: '50%',
-          background: 'rgba(255,255,255,0.04)',
-        }} />
+        <div style={{ position: 'absolute', right: -20, top: -20, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.04)' }} />
+        <div style={{ position: 'absolute', right: 10, top: 10, width: 70, height: 70, borderRadius: '50%', background: 'rgba(255,255,255,0.04)' }} />
       </div>
-      {/* Indicador de procesamiento */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <LoadingOutlined className="pasarela-icono-procesando" style={{ fontSize: 20, color: '#0F6E56' }} />
         <Typography.Text strong style={{ fontSize: 13 }}>{mensaje}</Typography.Text>
@@ -386,8 +351,14 @@ function TarjetaAnimacion({ mensaje }: { mensaje: string }) {
   );
 }
 
-function construirHtmlBoleta(c: ComprobanteResponseDTO, paciente: string, medico: string, fechaHoraCita: string, especialidad?: string): string {
-  const filaEspecialidad = especialidad ? `<div class="row"><span>Especialidad</span><span>${especialidad}</span></div>` : '';
+function construirHtmlProforma(
+  c: ComprobanteResponseDTO,
+  paciente: string,
+  items: ProformaResponseDTO['items'],
+): string {
+  const filaItems = items.map(item =>
+    `<div class="row"><span>${item.nombreItem}${item.cantidad && item.cantidad > 1 ? ` ×${item.cantidad}` : ''}</span><span>S/ ${item.precioCongelado.toFixed(2)}</span></div>`
+  ).join('');
   return `<!DOCTYPE html>
 <html lang="es"><head><meta charset="utf-8"><title>${c.numero}</title>
 <style>body{font-family:monospace;font-size:13px;max-width:360px;margin:24px auto;}
@@ -400,13 +371,10 @@ function construirHtmlBoleta(c: ComprobanteResponseDTO, paciente: string, medico
 <div class="line"></div>
 <div class="row"><span>Fecha de emisión</span><span>${dayjs(c.fechaEmision).format('DD/MM/YYYY HH:mm')}</span></div>
 <div class="row"><span>Paciente</span><span>${paciente}</span></div>
-<div class="row"><span>Médico</span><span>${medico}</span></div>
-${filaEspecialidad}
-<div class="row"><span>Fecha de cita</span><span>${dayjs(fechaHoraCita).format('DD/MM/YYYY HH:mm')}</span></div>
-<div class="row"><span>Concepto</span><span>Consulta médica</span></div>
-${c.descuento && c.descuento > 0 ? `<div class="line"></div><div class="row"><span>Precio del servicio</span><span>S/ ${(c.montoTotal + c.descuento).toFixed(2)}</span></div><div class="row" style="color:#389e0d"><span>Descuento (${c.conceptoDescuento ?? 'Descuento'})</span><span>-S/ ${c.descuento.toFixed(2)}</span></div>` : ''}
 <div class="line"></div>
-<div class="row"><span>Subtotal (sin IGV)</span><span>S/ ${c.subtotal.toFixed(2)}</span></div>
+${filaItems}
+<div class="line"></div>
+<div class="row"><span>Subtotal</span><span>S/ ${c.subtotal.toFixed(2)}</span></div>
 <div class="row"><span>IGV (18%)</span><span>S/ ${c.igv.toFixed(2)}</span></div>
 <div class="line"></div>
 <div class="row"><strong>TOTAL</strong><strong>S/ ${c.montoTotal.toFixed(2)}</strong></div>

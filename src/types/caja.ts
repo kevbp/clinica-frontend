@@ -1,8 +1,10 @@
 export type EstadoPagoConsulta = 'PENDIENTE' | 'PAGADO' | 'PAGADO_SIN_CONFIRMAR';
 export type EstadoItem = 'PENDIENTE' | 'PAGADO' | 'NO_DISPONIBLE';
+export type EstadoProforma = 'VIGENTE' | 'EXPIRADA' | 'PAGADA';
 export type EstadoNotaCredito = 'DISPONIBLE' | 'USADA';
 export type EstadoRetiro = 'SOLICITADO' | 'PROCESADO';
 export type TipoItem = 'MEDICAMENTO' | 'EXAMEN';
+export type TipoProforma = 'MEDICAMENTOS' | 'EXAMENES';
 export type TipoComprobante = 'CONSULTA' | 'PROFORMA';
 export type TipoNotaCredito =
   | 'CANCELACION_ANTICIPADA'
@@ -33,17 +35,37 @@ export interface ItemProformaResponseDTO {
   id: number;
   tipo: TipoItem;
   idItem: number;
-  descripcion: string;
-  precioCongelado: number;
+  nombreItem: string;
+  // Solo MEDICAMENTO
+  principioActivo?: string;
+  presentacion?: string;
+  dosis?: string;
+  frecuencia?: string;
+  duracion?: string;
   cantidad?: number;
+  // Solo EXAMEN
+  categoria?: string;
+  indicacionesPreparacion?: string;
+  // Precios y estado
+  precioUnitario: number;
+  precioCongelado: number;
   estado: EstadoItem;
 }
 
 export interface ProformaResponseDTO {
   id: number;
   idPaciente: number;
+  idReceta?: string;
+  idOrden?: string;
+  tipo: TipoProforma;
   fechaGeneracion: string;
+  fechaVigencia: string;
+  estadoProforma: EstadoProforma;
   items: ItemProformaResponseDTO[];
+}
+
+export interface ConstruirProformaRequestDTO {
+  idsItemsSeleccionados: number[];
 }
 
 export interface PagarItemsRequestDTO {
@@ -76,6 +98,8 @@ export interface ComprobanteResponseDTO {
   especialidad?: string;
   descuento?: number;
   conceptoDescuento?: string;
+  idReceta?: string;
+  idOrden?: string;
 }
 
 export interface RetiroRequestDTO {

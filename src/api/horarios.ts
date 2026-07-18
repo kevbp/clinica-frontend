@@ -6,6 +6,8 @@ import type {
   ProgramacionHorarioResponseDTO,
   ProgramacionHorarioRequestDTO,
   ProgramacionHorarioUpdateRequestDTO,
+  ProgramacionHorarioBatchRequestDTO,
+  ProgramacionHorarioBatchResponseDTO,
 } from '../types/horarios';
 
 export const listarConsultorios = (): Promise<ConsultorioResponseDTO[]> =>
@@ -34,6 +36,9 @@ export const obtenerTurnosPorPersonal = (
 
 export const crearTurno = (data: ProgramacionHorarioRequestDTO): Promise<ProgramacionHorarioResponseDTO> =>
   api.post<ProgramacionHorarioResponseDTO>('/programacion-horarios', data).then(r => r.data);
+
+export const crearTurnosBatch = (data: ProgramacionHorarioBatchRequestDTO): Promise<ProgramacionHorarioBatchResponseDTO> =>
+  api.post<ProgramacionHorarioBatchResponseDTO>('/programacion-horarios/batch', data).then(r => r.data);
 
 export const actualizarTurno = (
   id: number,

@@ -1,5 +1,6 @@
-import { useQuery, useQueries } from '@tanstack/react-query';
+import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as laboratorioApi from '../api/laboratorio';
+import type { ExamenRequestDTO, ExamenUpdateRequestDTO } from '../types/laboratorio';
 
 export function useBuscarExamenes(q: string) {
   return useQuery({
@@ -9,7 +10,13 @@ export function useBuscarExamenes(q: string) {
   });
 }
 
-// Resuelve nombres de exámenes para una lista de IDs (la orden del borrador solo trae idExamen).
+export function useListarExamenes(q?: string) {
+  return useQuery({
+    queryKey: ['laboratorio', 'catalogo', q ?? ''],
+    queryFn: () => laboratorioApi.listarExamenes(q),
+  });
+}
+
 export function useNombresExamenes(ids: number[]) {
   const idsUnicos = Array.from(new Set(ids));
   const resultados = useQueries({
@@ -26,4 +33,37 @@ export function useNombresExamenes(ids: number[]) {
     if (data) mapa.set(id, data.nombre);
   });
   return mapa;
+}
+
+export function useAutorizadosPorPaciente(idPaciente: number | null) {
+  return useQuery({
+    queryKey: ['laboratorio', 'autorizados', idPaciente],
+    queryFn: () => laboratorioApi.listarAutorizadosPorPaciente(idPaciente!),
+    enabled: idPaciente !== null,
+  });
+}
+
+export function useDisponibilidadLaboratorio() {
+  return useQuery({
+    queryKey: ['laboratorio', 'disponibilidad'],
+    queryFn: laboratorioApi.verificarDisponibilidad,
+    retry: false,
+  });
+}
+
+export function useCrearExamen() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: ExamenRequestDTO) => laboratorioApi.crearExamen(data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['laboratorio'] }),
+  });
+}
+
+export function useActualizarExamen() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: ExamenUpdateRequestDTO }) =>
+      laboratorioApi.actualizarExamen(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['laboratorio'] }),
+  });
 }
